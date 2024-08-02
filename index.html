@@ -5,81 +5,109 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Running Data Visualization</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
     <style>
         h1 {
             text-align: center;
+        }
+        #chart {
+            max-width: 100%;
+            height: 400px;
+        }
+        #loading {
+            text-align: center;
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+        #totalDistance {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        @media (max-width: 600px) {
+            #chart {
+                height: 300px;
+            }
+            #totalDistance {
+                font-size: 1em;
+            }
         }
     </style>
 </head>
 
 <body>
     <h1>Dragon Wings Run Club</h1>
-    <canvas id="runningChart" width="400" height="200"></canvas>
+    <div id="loading">Loading...</div>
+    <div id="chart" style="display:none;"></div>
+    <div id="totalDistance" style="display:none;"></div>
     <script>
         async function fetchData() {
-            const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vQ6zFlmP8dSQAAWgqs-9UQcjrCRUxmPlLj3_T-iYnZYhXpDtgfz3KkCcK5IWTTfsfAMQ_QzBCNVyEPu/pub?gid=2010704561&single=true&output=csv');
-            const data = await response.text();
-            const rows = data.split('\n').slice(1);
-            const labels = [];
-            const group1Miles = [];
-            const group2Miles = [];
-            const group3Miles = [];
+            try {
+                const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vQ6zFlmP8dSQAAWgqs-9UQcjrCRUxmPlLj3_T-iYnZYhXpDtgfz3KkCcK5IWTTfsfAMQ_QzBCNVyEPu/pub?gid=2010704561&single=true&output=csv');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.text();
+                const rows = data.split('\n');
+                const headers = rows[0].split(',');
+                const labels = [];
+                const series = headers.slice(1).map(header => ({
+                    name: header,
+                    data: []
+                }));
+                const totalDistance = [];
 
-            rows.forEach(row => {
-                const cols = row.split(',');
-                labels.push(cols[0]); // Date
-                group1Miles.push(parseFloat(cols[1])); // Group 1 Miles
-                group2Miles.push(parseFloat(cols[2])); // Group 2 Miles
-                group3Miles.push(parseFloat(cols[3])); // Group 2 Miles
-            });
+                rows.slice(1).forEach(row => {
+                    const cols = row.split(',');
+                    if (cols.length === headers.length) {
+                        labels.push(cols[0]); // Date
+                        let total = 0;
+                        cols.slice(1).forEach((col, index) => {
+                            const value = parseFloat(col);
+                            if (!isNaN(value)) {
+                                series[index].data.push(value);
+                                total += value;
+                            }
+                        });
+                        totalDistance.push(total);
+                    }
+                });
 
-            return { labels, group1Miles, group2Miles, group3Miles };
+                const totalDistanceSum = totalDistance.reduce((acc, val) => acc + val, 0);
+
+                const pieSeries = series.map(s => ({
+                    name: s.name,
+                    y: s.data.reduce((acc, val) => acc + val, 0)
+                }));
+
+                return { pieSeries, totalDistanceSum };
+            } catch (error) {
+                console.error('Fetch error: ', error);
+            }
         }
 
         async function createChart() {
+            document.getElementById('loading').style.display = 'block';
             const data = await fetchData();
-            const ctx = document.getElementById('runningChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.labels,
-                    datasets: [
-                        {
-                            label: 'Group 1 Miles',
-                            data: data.group1Miles,
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Group 2 Miles',
-                            data: data.group2Miles,
-                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
-                            borderColor: 'rgba(153, 102, 255, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'All Groups Combined Miles',
-                            data: data.group3Miles,
-                            backgroundColor: 'rgba(253, 102, 155, 0.2)',
-                            borderColor: 'rgba(253, 102, 155, 1)',
-                            borderWidth: 1
-                        }
-                    ]
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('chart').style.display = 'block';
+            document.getElementById('totalDistance').style.display = 'block';
+            document.getElementById('totalDistance').innerText = `Total Distance: ${data.totalDistanceSum.toFixed(2)} miles`;
+
+            Highcharts.chart('chart', {
+                chart: {
+                    type: 'pie'
                 },
-                options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function (value, index, ticks) {
-                                return value + ' miles'
-                            }
-                        }
-                    }
-                }
-            }
+                title: {
+                    text: 'Running Miles by Group'
+                },
+                series: [{
+                    name: 'Miles',
+                    colorByPoint: true,
+                    data: data.pieSeries
+                }]
             });
         }
 
