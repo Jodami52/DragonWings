@@ -26,6 +26,18 @@
             font-weight: bold;
             color: #2c3e50;
         }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #2c3e50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
         @media (max-width: 600px) {
             #chart {
                 height: 300px;
@@ -39,8 +51,11 @@
 
 <body>
     <h1>Dragon Wings Run Club</h1>
-    <div id="loading">Loading...</div>
-    <div id="chart" style="display:none;"></div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+    <div id="chart" role="img" aria-label="Column chart showing running miles by group" style="display:none;"></div>
     <div id="totalDistance" style="display:none;"></div>
     <script>
         async function fetchData() {
@@ -77,14 +92,10 @@
 
                 const totalDistanceSum = totalDistance.reduce((acc, val) => acc + val, 0);
 
-                const pieSeries = series.map(s => ({
-                    name: s.name,
-                    y: s.data.reduce((acc, val) => acc + val, 0)
-                }));
-
-                return { pieSeries, totalDistanceSum };
+                return { labels, series, totalDistanceSum };
             } catch (error) {
                 console.error('Fetch error: ', error);
+                document.getElementById('loading').innerText = 'Failed to load data. Please try again later.';
             }
         }
 
@@ -98,16 +109,65 @@
 
             Highcharts.chart('chart', {
                 chart: {
-                    type: 'pie'
+                    type: 'column'
                 },
                 title: {
                     text: 'Running Miles by Group'
                 },
-                series: [{
-                    name: 'Miles',
-                    colorByPoint: true,
-                    data: data.pieSeries
-                }]
+                xAxis: {
+                    categories: data.labels,
+                    title: {
+                        text: 'Date',
+                        style: {
+                            color: '#2c3e50',
+                            fontWeight: 'bold',
+                            fontSize: '14px'
+                        }
+                    },
+                    labels: {
+                        style: {
+                            color: '#2c3e50',
+                            fontSize: '12px'
+                        }
+                    },
+                    lineColor: '#2c3e50',
+                    lineWidth: 1,
+                    tickColor: '#2c3e50'
+                },
+                yAxis: {
+                    min: 0,
+                    title: {
+                        text: 'Miles',
+                        align: 'high',
+                        style: {
+                            color: '#2c3e50',
+                            fontWeight: 'bold',
+                            fontSize: '14px'
+                        }
+                    },
+                    labels: {
+                        style: {
+                            color: '#2c3e50',
+                            fontSize: '12px'
+                        }
+                    },
+                    gridLineColor: '#e6e6e6',
+                    lineColor: '#2c3e50',
+                    lineWidth: 1,
+                    tickColor: '#2c3e50'
+                },
+                tooltip: {
+                    valueSuffix: ' miles'
+                },
+                plotOptions: {
+                    column: {
+                        dataLabels: {
+                            enabled: true
+                        },
+                        colors: ['#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9', '#f15c80', '#e4d354', '#2b908f', '#f45b5b', '#91e8e1']
+                    }
+                },
+                series: data.series
             });
         }
 
